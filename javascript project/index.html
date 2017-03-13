@@ -17,6 +17,10 @@
 	</div>
 	<div id="footer">
 		<input type="text" name="myMessage" id="textInput" placeholder="Type your message here..."></input>
+		<div id="attachContainer">
+			<img src="paperclip.png" id="attachment">
+			<input type="file" id="myImageFile" onchange="readImageFile(this);" style="height:100%;width:100%;visibility:hidden;">
+		</div>
 		<div id="buttonContainer">
 			<div id="sendButton"></div>
 		</div>

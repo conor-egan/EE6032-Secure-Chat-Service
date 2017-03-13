@@ -19,9 +19,10 @@ body{
 	margin-bottom:40px;
 }
 #chatArea{
-	min-height:100%;
+	min-height:-webkit-calc(100% - 40px);
 	min-width:-webkit-calc(100% - 40px);
 	margin-left:40px;
+	margin-bottom:40px;
 	background-color:#262633;
 	position:absolute;
 	padding:5px;
@@ -102,6 +103,17 @@ body{
 	margin:8px;
 	flex:1;
 }
+#attachContainer{
+	height:32px;
+	width:32px;
+	margin:5px 5px 5px 0px;
+}
+#attachment{
+	height:100%;
+	width:100%;
+	top:0;
+	z-index:1;
+}
 #buttonContainer{
 	height:32px;
 	width:32px;
@@ -115,4 +127,14 @@ body{
 	width:100%;
 	background-color:#2B6C5D;
 	-webkit-clip-path: polygon(10% 10%, 90% 50%, 10% 90%, 20% 53%, 55% 50%, 20% 47%);
+}
+.imageContainer{
+	width:100%;
+	max-height:522px;
+	padding:5px;
+	border-bottom: 1px solid #2d2d3d;
+}
+.myImage{
+	max-height:512px;
+	max-width:512px;
 }

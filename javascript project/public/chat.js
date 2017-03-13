@@ -10,6 +10,29 @@ document.getElementById("buttonContainer").onclick = function() {
 	send();
 }
 
+document.getElementById("attachment").onclick = function() {
+	//Handle click event for send button
+	console.log("Attachment pressed");
+	document.getElementById('myImageFile').click();
+}
+
+function readImageFile(input) {
+	if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        var img = document.createElement("img");
+        img.classList.add("myImage");
+
+        reader.onload = function (e) {
+            img.src = e.target.result;
+        };
+
+        reader.readAsDataURL(input.files[0]);
+        chatBox.innerHTML += "<div class='imageContainer'></div>";
+        console.log(chatBox.getElementsByClassName("imageContainer").length);
+        chatBox.getElementsByClassName("imageContainer")[chatBox.getElementsByClassName("imageContainer").length-1].appendChild(img);
+    }
+}
+
 socket.on('chat message', function(msg){
     displayMessage(msg);
   });
