@@ -9,9 +9,7 @@ body{
 	height:100%;
 	width:100%;
 }
-#login{
-	
-}
+
 #chatContainer{
 	background-color:#262633;
 	min-height:-webkit-calc(100% - 40px);
@@ -50,7 +48,7 @@ body{
 	transition: min-width 0.5s ease-out;
 }
 .settingsOpened{
-	min-width:200px;
+	min-width:300px;
 }
 #settingsContainer{
 	height:30px;
@@ -128,8 +126,15 @@ body{
 	background-color:#2B6C5D;
 	-webkit-clip-path: polygon(10% 10%, 90% 50%, 10% 90%, 20% 53%, 55% 50%, 20% 47%);
 }
+.myImageContainer{
+	width:100%;
+	max-height:522px;
+	padding:5px;
+	border-bottom: 1px solid #2d2d3d;
+}
 .imageContainer{
 	width:100%;
+	text-align:right;
 	max-height:522px;
 	padding:5px;
 	border-bottom: 1px solid #2d2d3d;
@@ -137,4 +142,20 @@ body{
 .myImage{
 	max-height:512px;
 	max-width:512px;
+}
+.image{
+/*
+	float:right;
+*/
+	max-height:512px;
+	max-width:512px;
+}
+
+.settingsOption{
+	position:absolute;
+	right:40px;
+	top: 40px;
+	white-space: nowrap;
+	overflow:hidden;
+	color: white;
 }

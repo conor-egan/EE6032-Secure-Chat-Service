@@ -21,6 +21,21 @@ io.on('connection', function(socket){
     socket.broadcast.emit('chat message', msg);
   });
   
+  socket.on('base64 file', function (msg) {
+    console.log('received base64 file from ' + msg.username);
+    socket.username = msg.username;
+    // socket.broadcast.emit('base64 image', //exclude sender
+    socket.broadcast.emit('base64 file',
+
+        {
+          username: socket.username,
+          file: msg.file,
+          fileName: msg.fileName
+        }
+
+    );
+});
+  
 });
 
 

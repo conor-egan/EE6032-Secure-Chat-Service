@@ -6,12 +6,17 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
+<body onload="enterUserName()">
 	<div id="chatContainer">
 		<div class="settingsBar">
 			<div id="settingsContainer">
 				<div id="settings"><div id="innerSettings"></div></div>
 			</div>
+			
+			<div class="settingsOption">
+				Encrypt my Messages <input type="checkbox" name="encryption" value="encrypted"><br>
+			</div>
+			
 		</div>
 		<div id="chatArea"></div>
 	</div>

@@ -4,6 +4,7 @@ var socket = io();
 var myMessage;
 var textBox = document.getElementById("textInput");
 var chatBox = document.getElementById("chatArea");
+var usrName;
 
 document.getElementById("buttonContainer").onclick = function() {
 	//Handle click event for send button
@@ -16,26 +17,62 @@ document.getElementById("attachment").onclick = function() {
 	document.getElementById('myImageFile').click();
 }
 
+function enterUserName() {
+	usrName = prompt("Enter your username");
+	console.log(usrName);
+}
+
 function readImageFile(input) {
 	if (input.files && input.files[0]) {
+		var fileName = input.files[0];
         var reader = new FileReader();
-        var img = document.createElement("img");
-        img.classList.add("myImage");
 
         reader.onload = function (e) {
-            img.src = e.target.result;
+            var src = e.target.result;
+            displayMyImage(src);
+            sendFile(fileName,src);
         };
 
-        reader.readAsDataURL(input.files[0]);
+        reader.readAsDataURL(fileName);
+    }
+}
+
+function displayImage(src) {
+	var img = document.createElement("img");
+        img.classList.add("image");
+        img.src = src;
         chatBox.innerHTML += "<div class='imageContainer'></div>";
         console.log(chatBox.getElementsByClassName("imageContainer").length);
         chatBox.getElementsByClassName("imageContainer")[chatBox.getElementsByClassName("imageContainer").length-1].appendChild(img);
-    }
+}
+
+function displayMyImage(src) {
+	var img = document.createElement("img");
+        img.classList.add("myImage");
+        img.src = src;
+        chatBox.innerHTML += "<div class='myImageContainer'></div>";
+        console.log(chatBox.getElementsByClassName("myImageContainer").length);
+        chatBox.getElementsByClassName("myImageContainer")[chatBox.getElementsByClassName("myImageContainer").length-1].appendChild(img);
+}
+
+function sendFile(file,data){
+
+        var msg ={};
+        msg.username = usrName;
+        msg.file = data;
+        msg.fileName = file.name;
+        console.log(msg.fileName);
+        socket.emit('base64 file', msg);
 }
 
 socket.on('chat message', function(msg){
     displayMessage(msg);
   });
+  
+socket.on('base64 file', function(msg) {
+	displayImage(msg.file);
+  });
+
 
 function send() {
 	if(textBox.value != "") {
