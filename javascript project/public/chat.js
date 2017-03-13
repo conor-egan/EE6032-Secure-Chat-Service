@@ -6,6 +6,51 @@ var textBox = document.getElementById("textInput");
 var chatBox = document.getElementById("chatArea");
 var usrName;
 
+var Passphrase = "usrName";
+var bits = 1024;
+var myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
+var myPublicKeyString = cryptico.publicKeyString(myRSAKey);
+
+var samplePublicKey = "uXjrkGqe5WuS7zsTg6Z9DuS8cXLFz38ue+xrFzxrcQJCXtVccCoUFP2qH/AQ4qMvxxvqkSYBpRm1R5a4/NdQ5ei8sE8gfZEq7dlcR+gOSv3nnS4/CX1n5Z5m8bvFPF0lSZnYQ23xlyjXTaNacmV0IuZbqWd4j9LfdAKq5dvDaoE=";
+
+function rsaEncrypt(message, targetPublicKey) {
+	var EncryptionResult = cryptico.encrypt(message, targetPublicKey);
+	console.log(EncryptionResult.cipher);
+	return EncryptionResult.cipher;
+}
+
+function rsaDecrypt(message, myRSAKey) {
+	var EncryptionResult = cryptico.decrypt(message, targetPublicKey);
+	console.log(EncryptionResult.plaintext);
+	return EncryptionResult.plaintext;
+}
+
+function aesEncrypt(message) {
+	AES_Init();
+
+	var key = new Array(16);
+	for(var i = 0; i < 16; i++)
+	key[i] = i;
+	
+	var block = string2Bin(message);
+	AES_ExpandKey(key);
+	AES_Encrypt(block, key);
+	var data=bin2String(block);
+
+	console.log("AES encrypted message: "+ data);
+	
+	console.log("Decrypted message: "+decrypt(data,key));
+	
+	AES_Done();
+}
+
+function decrypt ( inputStr,key ) {
+	block = string2Bin(inputStr);
+	AES_Decrypt(block, key);
+	var data=bin2String(block);
+	return data;
+}
+
 document.getElementById("buttonContainer").onclick = function() {
 	//Handle click event for send button
 	send();
@@ -83,14 +128,33 @@ function sha1(message) {
 function send() {
 	if(textBox.value != "") {
 	myMessage = textBox.value;
-	var shaObj = new jsSHA("SHA-1", "TEXT");
-	shaObj.update(myMessage);
-	var hash = shaObj.getHash("HEX");
 	console.log(sha1(myMessage));
 	textBox.value = "";
 	socket.emit("chat message", myMessage);
 	displayMyMessage(myMessage);
+	aesEncrypt(myMessage);
+	rsaEncrypt(myMessage,samplePublicKey);
 	}
+}
+
+function bin2String(array) {
+	var result = "";
+	for (var i = 0; i < array.length; i++) {
+		result += String.fromCharCode(parseInt(array[i], 2));
+	}
+	return result;
+}
+
+function string2Bin(str) {
+	var result = [];
+	for (var i = 0; i < str.length; i++) {
+		result.push(str.charCodeAt(i));
+	}
+	return result;
+}
+
+function bin2String(array) {
+	return String.fromCharCode.apply(String, array);
 }
 
 function displayMyMessage(message) {
