@@ -4,6 +4,7 @@ var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
+
 app.get('/', function(req, res){
   res.sendFile(__dirname + '/index.html');
 });
@@ -24,7 +25,6 @@ io.on('connection', function(socket){
   socket.on('base64 file', function (msg) {
     console.log('received base64 file from ' + msg.username);
     socket.username = msg.username;
-    // socket.broadcast.emit('base64 image', //exclude sender
     socket.broadcast.emit('base64 file',
 
         {

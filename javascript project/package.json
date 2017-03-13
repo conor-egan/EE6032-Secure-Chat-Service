@@ -4,6 +4,7 @@
   "description": "Socket communications app",
   "dependencies": {
     "express": "^4.10.2",
-    "socket.io": "^1.7.3"
+    "socket.io": "^1.7.3",
+    "jssha": "^1.0.0"
   }
 }

@@ -73,10 +73,20 @@ socket.on('base64 file', function(msg) {
 	displayImage(msg.file);
   });
 
+function sha1(message) {
+	var shaObj = new jsSHA("SHA-1", "TEXT");
+	shaObj.update(message);
+	var hash = shaObj.getHash("HEX");
+	return hash;
+}
 
 function send() {
 	if(textBox.value != "") {
 	myMessage = textBox.value;
+	var shaObj = new jsSHA("SHA-1", "TEXT");
+	shaObj.update(myMessage);
+	var hash = shaObj.getHash("HEX");
+	console.log(sha1(myMessage));
 	textBox.value = "";
 	socket.emit("chat message", myMessage);
 	displayMyMessage(myMessage);
