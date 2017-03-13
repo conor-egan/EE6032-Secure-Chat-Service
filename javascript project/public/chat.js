@@ -11,8 +11,6 @@ var bits = 1024;
 var myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
 var myPublicKeyString = cryptico.publicKeyString(myRSAKey);
 
-var samplePublicKey = "uXjrkGqe5WuS7zsTg6Z9DuS8cXLFz38ue+xrFzxrcQJCXtVccCoUFP2qH/AQ4qMvxxvqkSYBpRm1R5a4/NdQ5ei8sE8gfZEq7dlcR+gOSv3nnS4/CX1n5Z5m8bvFPF0lSZnYQ23xlyjXTaNacmV0IuZbqWd4j9LfdAKq5dvDaoE=";
-
 function rsaEncrypt(message, targetPublicKey) {
 	var EncryptionResult = cryptico.encrypt(message, targetPublicKey);
 	console.log(EncryptionResult.cipher);
@@ -20,7 +18,7 @@ function rsaEncrypt(message, targetPublicKey) {
 }
 
 function rsaDecrypt(message, myRSAKey) {
-	var EncryptionResult = cryptico.decrypt(message, targetPublicKey);
+	var EncryptionResult = cryptico.decrypt(message, myRSAKey);
 	console.log(EncryptionResult.plaintext);
 	return EncryptionResult.plaintext;
 }
@@ -133,7 +131,8 @@ function send() {
 	socket.emit("chat message", myMessage);
 	displayMyMessage(myMessage);
 	aesEncrypt(myMessage);
-	rsaEncrypt(myMessage,samplePublicKey);
+	var cipher = rsaEncrypt(myMessage,myPublicKeyString);
+	rsaDecrypt(cipher,myRSAKey);
 	}
 }
 
