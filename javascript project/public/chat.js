@@ -31,6 +31,8 @@ var otherPublicKey;
 
 var sharedSecretKey;
 
+var otherUserNonce;
+
 function sendPublicKey(key) {
 	// Create array of public key, and hashed public key encrypted with private key
 	var publicKeyExchange = {};
@@ -43,7 +45,7 @@ function sendPublicKey(key) {
 function createNonce() {
 	var array = [];
 	for(i=0;i<8;i++) {
-		array[i].push(Math.round(Math.random()*255));
+		array.push(Math.round(Math.random()*255));
 	}
 	return array;
 }
@@ -56,10 +58,10 @@ function keyExchangeStep1(nonce) {
 	socket.emit("KeyGen Exchange", keyGenExchange);
 }
 
-socket.on("KeyGen Exchange", function(msg)) {
+socket.on("KeyGen Exchange", function(msg){
 	var key = receiveNonceA(msg);
 	keyExchangeStep3(key);
-}
+});
 
 function keyExchangeStep3(seshKey) {
 	
@@ -79,13 +81,13 @@ function receiveNonceA(message){
 	}
 }
 
-function createSessionkey(keyA, keyB) {
+function createSessionKey(keyA, keyB) {
 	var sessionKey = [];
 	for(i=0;i<keyA.length;i++){
-		sessionKey[i].push(keyA[i]);
+		sessionKey.push(keyA[i]);
 	}
 	for(i=0;i<keyB.length;i++){
-		sessionKey[i+8].push(keyB[i]);
+		sessionKey.push(keyB[i]);
 	}
 	
 	return sessionKey;
@@ -214,7 +216,7 @@ socket.on('public key', function(publicKeyReceived) {
 	// Need to first check if the key received has already been received
 	// If so, do nothing, if not, emit my public key
 	if(otherPublicKey != publicKeyReceived.publicKey){
-	    socket.emit('public key', publicKeyExchange);
+	    sendPublicKey(myPublicKey);
 		console.log('Other users public key: '+ publicKeyReceived.publicKey);
 		otherPublicKey = publicKeyReceived.publicKey;
 		
@@ -224,6 +226,28 @@ socket.on('public key', function(publicKeyReceived) {
 			
 		}
 	}
+	else {
+		socket.emit('nonce', myNonce);
+	}	
+});
+socket.on('nonce', function(nonceReceived){
+    console.log('nonce received: ' + nonceReceived);
+	// Create session key with my nonce and nonceReceived
+	sharedSecretKey = createSessionKey(myNonce, nonceReceived);
+	console.log("Session key: " + sharedSecretKey);
+	// Key exchange step 3 send my nonce and the nonce received (noncePackage)
+	var noncePackage = {};
+	noncePackage.senderNonce = myNonce;
+	noncePackage.nonceReceived = nonceReceived;
+	socket.emit('nonce package', noncePackage);
+});
+
+socket.on('nonce package', function(noncePackageReceived){
+    
+	otherUserNonce = noncePackageReceived.nonceReceived;
+	// Create session key with my nonce and nonceReceived
+	sharedSecretKey = createSessionKey(otherUserNonce, myNonce);
+	console.log("Session key: " + sharedSecretKey);
 	
 });
 

@@ -3,12 +3,16 @@ var express = require('express'); 	// node web application framework
 var app = express();				// New instance of express
 var http = require('http').Server(app);	// create node simple server
 var io = require('socket.io')(http);	// Load socket.io on the server
-
+var maxConnections = 2;
+var connectionCounter = 0;
 
 // When a client connects to the server, 
 // this sends the HTML file to the client's browser
 app.get('/', function(req, res){
-  res.sendFile(__dirname + '/index.html');
+	if(connectionCounter == 2) {
+			res.end();
+			console.log("Client connection prevented, Max clients reached");
+	} else {res.sendFile(__dirname + '/index.html');}
 });
 
 // Connection event handler for the server
@@ -28,6 +32,21 @@ io.on('connection', function(socket){
 		{
 			publicKey: publicKeyExchange.publicKey,
 			DSnInt: publicKeyExchange.DSnInt
+		}
+	);
+  });
+  
+  // When a nonce is received
+  socket.on('nonce', function(nonce){
+	socket.broadcast.emit('nonce', nonce);
+  });
+  
+  // When a nonce package is received
+  socket.on('nonce package', function(noncePackage){
+	socket.broadcast.emit('nonce package', 
+		{
+			nonceReceived: noncePackage.senderNonce,
+			myNonce: noncePackage.nonceReceived
 		}
 	);
   });
