@@ -278,7 +278,7 @@ function send() {
 		textBox.value = "";		// clear the textBox
 		socket.emit("chat message", myMessage);	//Emit the text message
 		displayMyMessage(myMessage);		// Display my message
-		aesEncrypt(myMessage);		// Run the AES Encryption demo function
+		aesEncrypt(myMessage,sharedSecretKey);		// Run the AES Encryption demo function
 		var cipher = rsaEncrypt(myMessage,myPublicKey); // RSA encrypt with the demo key passPhrase
 		rsaDecrypt(cipher,myRSAKey);	// Decrypt the RSA cipher with the demo key
 	}
