@@ -26,7 +26,7 @@ var myPublicKeyString = cryptico.publicKeyString(myRSAKey);
 // Function that takes in the message to be encrypted and the public key
 // for the target recipient
 function rsaEncrypt(message, targetPublicKey) {
-	var EncryptionResult = cryptico.encrypt(message, targetPublicKey);
+	var EncryptionResult = cryptico.encrypt(message, targetPublicKey, myRSAKey);
 	console.log(EncryptionResult.cipher); // log the encrypted message to the console
 	return EncryptionResult.cipher;	// return the encrypted message
 }
@@ -35,6 +35,7 @@ function rsaEncrypt(message, targetPublicKey) {
 function rsaDecrypt(encryptedMessage, myRSAKey) {
 	var EncryptionResult = cryptico.decrypt(encryptedMessage, myRSAKey);
 	console.log(EncryptionResult.plaintext);
+	console.log(EncryptionResult.signature);
 	return EncryptionResult.plaintext;
 }
 

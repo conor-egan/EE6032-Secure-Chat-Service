@@ -3,22 +3,30 @@ var express = require('express'); 	// node web application framework
 var app = express();				// New instance of express
 var http = require('http').Server(app);	// create node simple server
 var io = require('socket.io')(http);	// Load socket.io on the server
-
+var maxConnections = 2;
+var connectionCounter = 0;
 
 // When a client connects to the server, 
 // this sends the HTML file to the client's browser
 app.get('/', function(req, res){
-  res.sendFile(__dirname + '/index.html');
+	
+	if(connectionCounter == 2) {
+			res.end();
+			console.log("Client connection prevented, Max clients reached");
+	} else {res.sendFile(__dirname + '/index.html');}
 });
 
 // Connection event handler for the server
 // When a client connects to the server run this function
 io.on('connection', function(socket){
 	
+	connectionCounter += 1;
+	
   console.log('User connected'); // Print User connected
   
   // When a client disconnects, run this function
   socket.on('disconnect', function(){
+	  connectionCounter -= 1;
     console.log('User disconnected');
   });
   
