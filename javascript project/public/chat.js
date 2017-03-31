@@ -1,45 +1,25 @@
-
-// Create settingsBar variable and access the HTML settingsBar element
 var settingsBar = document.getElementsByClassName("settingsBar")[0];
-// Create a new socket
-var socket = io();
-
-// Variable to hold my outgoing message
-var myMessage;
-
-// Create a textBox variable to access the HTML textBox element
 var textBox = document.getElementById("textInput");
-// Create a chatBox variable to access the HTML chatArea element
 var chatBox = document.getElementById("chatArea");
-// Variable to hold this clients username
-var usrName;
-
-// Variable Passphrase to hold the RSA key generation 'phrase'
-var Passphrase;
-
-var myNonce;
-
-// bits indicates how many bits in the RSA encryption
+var encryptionSwitch = document.getElementById("encryptionBox");
+var socket = io();
+var usrName, Passphrase;
+var myMessage;
+var myNonce, otherUserNonce;
 var bits = 1024;
-// Create variable myRSAKey using the cryptico.generateRSAKey() function
-var myRSAKey;
-// Create variable myPublicKey from the variable myRSAKey
-var myPublicKey;
-
-// Var to store other users public key
-var otherPublicKey;
-
+var myRSAKey, myPublicKey, otherPublicKey;
 var sharedSecretKey;
+var encryptFlag, otherUserFlag;
 
-var otherUserNonce;
-
-function sendPublicKey(key) {
-	// Create array of public key, and hashed public key encrypted with private key
-	var publicKeyExchange = {};
-	publicKeyExchange.publicKey = key;
-	publicKeyExchange.hashedKey = sha1(key);
-	// Send my public key to the server
-	socket.emit('public key', publicKeyExchange);
+function start(){
+	usrName = prompt("Enter your username");
+	Passphrase = prompt("Enter a passphrase for encryption");
+	myNonce = createNonce();
+	myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
+	myPublicKey = cryptico.publicKeyString(myRSAKey);
+	sendPublicKey(myPublicKey);
+	console.log("Client: "+usrName+" has completed start()");
+	
 }
 
 function createNonce() {
@@ -48,37 +28,69 @@ function createNonce() {
 		array.push(Math.round(Math.random()*255));
 	}
 	return array;
+	console.log("Nonce Successfully created");
 }
 
-function keyExchangeStep1(nonce) {
-	var keyGenExchange = {};
-	var hashNonce = sha1(nonce);
-	keyGenExchange.nonce = cryptico.encrypt(nonce, otherPublicKey);
-	keyGenExchange.signedNonce = cryptico.encrypt(nonce, otherPublicKey, myRSAKey);
-	socket.emit("KeyGen Exchange", keyGenExchange);
+function sendPublicKey(key) {
+	var publicKeyExchange = {};
+	publicKeyExchange.publicKey = key;
+	publicKeyExchange.hashedKey = sha1(key);
+	socket.emit('public key', publicKeyExchange);
+	console.log("Public key sent");
 }
 
-socket.on("KeyGen Exchange", function(msg){
-	var key = receiveNonceA(msg);
-	keyExchangeStep3(key);
+socket.on('public key', function(publicKeyReceived) {
+	if(otherPublicKey != publicKeyReceived.publicKey){
+	    sendPublicKey(myPublicKey);
+		// console.log('Other users public key: '+ publicKeyReceived.publicKey);
+		otherPublicKey = publicKeyReceived.publicKey;
+		
+		var HashKey = publicKeyReceived.hashedKey;
+		if(sha1(otherPublicKey) == HashKey) {
+			console.log('Integrity of key exists');
+		}
+	}
+	else {
+		// Protocol Step 1 
+		var msg = {};
+		var cipher = cryptico.encrypt(array2String(myNonce), otherPublicKey);
+		msg.nonce = cipher.cipher;
+		var hashed = cryptico.encrypt(sha1(array2String(myNonce)), otherPublicKey, myRSAKey);
+		msg.hashed = hashed.cipher;
+		socket.emit('ProtocolStep1', msg);
+		console.log("Client "+usrName+" has emitted step1");
+	}	
 });
 
-function keyExchangeStep3(seshKey) {
-	
-}
-
-function receiveNonceA(message){
-	var receivedNonce = rsaDecrypt(message.nonce, myRSAKey);
-	var decryptedSignature = rsaDecrypt(message.signedNonce, myRSAKey);
-	
-	var signedBoolean = decryptedSignature.signature;
-	if (signedBoolean == "verified") {
-		console.log("signature verified");
-		var key = createSessionKey(receivedNonce, myNonce);
-		return key;
-		} else {
-		console.log("Signature failed");
+// On receiving ProtocolStep1, emit step2
+socket.on('ProtocolStep1', function(Protocol1Received){
+	console.log("Entering receive protocolStep1");
+	var nonceReceived = cryptico.decrypt(Protocol1Received.nonceReceived, myRSAKey);
+	console.log(nonceReceived.plaintext);
+	var nonceArray = string2Array(nonceReceived.plaintext);
+	var hashedNonceReceived = cryptico.decrypt(Protocol1Received.hashedNonce, myRSAKey);
+	// console.log("Nonce received: "+ nonceArray);
+	if(sha1(nonceReceived.plaintext) != hashedNonceReceived.plaintext ){
+		console.log("Nonce has been tampered with")
+	} else {
+		// Create session key with my nonce and nonceReceived
+		console.log("Client "+usrName+" is emitting protocolStep3");
+		sharedSecretKey = createSessionKey(myNonce, nonceArray);
+		protocolStep3(nonceArray);
 	}
+});
+
+function protocolStep3(receivedNonce) {
+	console.log(array2String(myNonce));
+	var step3Msg = {};
+	step3Msg.myNonce = cryptico.encrypt(array2String(myNonce), otherPublicKey).cipher;
+	console.log("My nonce cipher: "+step3Msg.myNonce+" type: "+typeof(step3Msg.myNonce));
+	step3Msg.nonceReceived = cryptico.encrypt(aesEncrypt(array2String(receivedNonce),sharedSecretKey), otherPublicKey).cipher;
+	step3Msg.hashedNonce = cryptico.encrypt(sha1(array2String(myNonce)), otherPublicKey, myRSAKey).cipher;
+	step3Msg.hashedResponse = cryptico.encrypt(sha1(aesEncrypt(array2String(receivedNonce),sharedSecretKey)), otherPublicKey, myRSAKey).cipher;
+	console.log("Step3Msg: "+step3Msg+" type: "+typeof(step3Msg));
+	socket.emit('nonce package', step3Msg);
+	console.log("Step3 Emitted successfully");
 }
 
 function createSessionKey(keyA, keyB) {
@@ -89,9 +101,17 @@ function createSessionKey(keyA, keyB) {
 	for(i=0;i<keyB.length;i++){
 		sessionKey.push(keyB[i]);
 	}
-	
 	return sessionKey;
 }
+
+socket.on('nonce package', function(noncePackageReceived){
+	//~ console.log(noncePackageReceived.otherNonce.plaintext);
+	otherUserNonce = string2Array(cryptico.decrypt(noncePackageReceived.otherNonce,myRSAKey).plaintext);
+	var AESResponse = cryptico.decrypt(noncePackageReceived.response,myRSAKey).plaintext;
+	var hashedOtherUserNonce = cryptico.decrypt(noncePackageReceived.response, myRSAKey).plaintext;
+	var hashedAESResponse = cryptico.decrypt(noncePackageReceived.hashedResponse, myRSAKey).plaintext;
+	sharedSecretKey = createSessionKey(otherUserNonce,myNonce);
+});
 
 // Function that takes in the message to be encrypted and the public key
 // for the target recipient
@@ -113,53 +133,78 @@ function rsaDecrypt(encryptedMessage, myRSAKey) {
 // a 128 bit key, converts the string to binary, encrypts the message,
 // prints the encrypted message, calls the decrypt function and prints
 // the decrypted message, then closes the AES session
-function aesEncrypt(message, key) {
-	AES_Init();
-	
-	var block = string2Bin(message);
-	AES_ExpandKey(key);
-	AES_Encrypt(block, key);
-	var data=bin2String(block);
-	
-	console.log("AES encrypted message: "+ data);
-	
-	console.log("Decrypted message: "+decrypt(data,key));
-	
-	AES_Done();
+function aesEncrypt(message, key) {	
+	var textBytes = aesjs.utils.utf8.toBytes(message);
+	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
+	var encryptedBytes = aesCtr.encrypt(textBytes);
+	var encryptedHex = aesjs.utils.hex.fromBytes(encryptedBytes);
+	return encryptedHex;
 }
 
 function decrypt ( inputStr,key ) {
-	block = string2Bin(inputStr);
-	AES_Decrypt(block, key);
-	var data=bin2String(block);
-	return data;
+	var encryptedBytes = aesjs.utils.hex.toBytes(inputStr);
+	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
+	var decryptedBytes = aesCtr.decrypt(encryptedBytes);
+	
+
+	// Convert our bytes back into text
+	var decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
+	return decryptedText;
 }
 
-document.getElementById("buttonContainer").onclick = function() {
-	//Handle click event for send button
-	send();
+// Function to call the sha1 hashing algorithm in sha.js
+function sha1(message) {
+	var shaObj = new jsSHA("SHA-1", "TEXT");
+	shaObj.update(message);
+	var hash = shaObj.getHash("HEX");
+	return hash;
 }
 
-document.getElementById("attachment").onclick = function() {
-	//Handle click event for attachment button
-	console.log("Attachment pressed");
-	document.getElementById('myImageFile').click();
+// Funtion to send a chat message
+function send() {
+	if(textBox.value != "") { // if textBox is not empty
+		if(encryptionSwitch.checked) {
+			console.log("Encryption is on");
+			var myMessage = textBox.value; // get the textBox contents
+			textBox.value = "";		// clear the textBox
+			var encryptedMsg = aesEncrypt(myMessage, sharedSecretKey);
+			var msg = {};
+			msg.encryptFlag = aesEncrypt("1", sharedSecretKey);
+			msg.encryptedMsg = encryptedMsg;
+			socket.emit("chat message", msg);	//Emit the text message
+			displayMyMessage(myMessage);		// Display my message
+		} else {
+			console.log("Encryption is off");
+			var myMessage = textBox.value; // get the textBox contents
+			textBox.value = "";		// clear the textBox
+			var encryptedMsg = myMessage;
+			var msg = {};
+			msg.encryptFlag = aesEncrypt("0", sharedSecretKey);
+			msg.encryptedMsg = encryptedMsg;
+			socket.emit("chat message", msg);	//Emit the text message
+			displayMyMessage(myMessage);		// Display my message
+		}
+	}
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// This promts for a Username input, function is run on body load
-function start() {
-	usrName = prompt("Enter your username");
-	Passphrase = prompt("Enter a passphrase for encryption");
-	
-	myNonce = createNonce();
-	
-	// Create variable myRSAKey using the cryptico.generateRSAKey() function
-	myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
-	// Create variable myPublicKey from the variable myRSAKey
-	myPublicKey = cryptico.publicKeyString(myRSAKey);
-	
-	sendPublicKey(myPublicKey);
+// When a 'chat message' event is received, run this function
+socket.on('chat message', function(msg){
+	otherUserFlag = decrypt(msg.otherUserFlag, sharedSecretKey);
+	if(otherUserFlag == "1") {
+		var decryptedMsg = decrypt(msg.message, sharedSecretKey);
+		displayMessage(decryptedMsg);
+	} else {
+		displayMessage(msg.message);
+	}
+    
+});
+
+function displayMyMessage(message) {
+	chatBox.innerHTML += "<div class='myMessage'>"+message+"</div>";
+}
+
+function displayMessage(message) {
+	chatBox.innerHTML += "<div class='message'>"+message+"</div>";
 }
 
 // Take the file data from the input button, read the file
@@ -178,6 +223,24 @@ function readImageFile(input) {
         reader.readAsDataURL(fileName); // Read the file
 	}
 }
+
+// This function emits the base 64 file object to the server
+// it accepts a file name and the data of the file
+function sendFile(file,data){
+	var msg = {}; // create a message object
+	msg.username = usrName; //create properties for the message object
+	var encryptedFile = aesEncrypt(data, sharedSecretKey);
+	msg.file = encryptedFile;
+	msg.fileName = file.name;
+	console.log(msg.fileName);
+	socket.emit('base64 file', msg); // send the file to the server
+}
+
+// When a 'base64 file' event is received, run this function  
+socket.on('base64 file', function(msg) {
+	var decryptedFile = decrypt(msg.file, sharedSecretKey);
+	displayImage(decryptedFile);
+});
 
 // Create an HTML img element and use it to display the image
 function displayImage(src) {
@@ -200,127 +263,23 @@ function displayMyImage(src) {
 	chatBox.getElementsByClassName("myImageContainer")[chatBox.getElementsByClassName("myImageContainer").length-1].appendChild(img);
 }
 
-// This function emits the base 64 file object to the server
-// it accepts a file name and the data of the file
-function sendFile(file,data){
-	
-	var msg = {}; // create a message object
-	msg.username = usrName; //create properties for the message object
-	msg.file = data;
-	msg.fileName = file.name;
-	console.log(msg.fileName);
-	socket.emit('base64 file', msg); // send the file to the server
-}
-socket.on('public key', function(publicKeyReceived) {
-	// Need to emit my public key here incase I am the first user connected
-	// Need to first check if the key received has already been received
-	// If so, do nothing, if not, emit my public key
-	if(otherPublicKey != publicKeyReceived.publicKey){
-	    sendPublicKey(myPublicKey);
-		console.log('Other users public key: '+ publicKeyReceived.publicKey);
-		otherPublicKey = publicKeyReceived.publicKey;
-		
-		var HashKey = publicKeyReceived.hashedKey;
-		if(sha1(otherPublicKey) == HashKey) {
-			console.log('Integrity of key exists');
-			
-		}
-	}
-	else {
-		socket.emit('nonce', myNonce);
-	}	
-});
-socket.on('nonce', function(nonceReceived){
-    console.log('nonce received: ' + nonceReceived);
-	// Create session key with my nonce and nonceReceived
-	sharedSecretKey = createSessionKey(myNonce, nonceReceived);
-	console.log("Session key: " + sharedSecretKey);
-	// Key exchange step 3 send my nonce and the nonce received (noncePackage)
-	var noncePackage = {};
-	noncePackage.senderNonce = myNonce;
-	noncePackage.nonceReceived = nonceReceived;
-	socket.emit('nonce package', noncePackage);
-});
-
-socket.on('nonce package', function(noncePackageReceived){
-    
-	otherUserNonce = noncePackageReceived.nonceReceived;
-	// Create session key with my nonce and nonceReceived
-	sharedSecretKey = createSessionKey(otherUserNonce, myNonce);
-	console.log("Session key: " + sharedSecretKey);
-	
-});
-
-
-// When a 'chat message' event is received, run this function
-socket.on('chat message', function(msg){
-    displayMessage(msg);
-});
-
-// When a 'base64 file' event is received, run this function  
-socket.on('base64 file', function(msg) {
-	displayImage(msg.file);
-});
-
-// Function to call the sha1 hashing algorithm in sha.js
-function sha1(message) {
-	var shaObj = new jsSHA("SHA-1", "TEXT");
-	shaObj.update(message);
-	var hash = shaObj.getHash("HEX");
-	return hash;
-}
-
-// Funtion to send a chat message
-function send() {
-	if(textBox.value != "") { // if textBox is not empty
-		myMessage = textBox.value; // get the textBox contents
-		console.log(sha1(myMessage)); // log the hashed message
-		textBox.value = "";		// clear the textBox
-		socket.emit("chat message", myMessage);	//Emit the text message
-		displayMyMessage(myMessage);		// Display my message
-		aesEncrypt(myMessage,sharedSecretKey);		// Run the AES Encryption demo function
-		var cipher = rsaEncrypt(myMessage,myPublicKey); // RSA encrypt with the demo key passPhrase
-		rsaDecrypt(cipher,myRSAKey);	// Decrypt the RSA cipher with the demo key
-	}
-}
-
-// Utility functions
-function bin2String(array) {
-	var result = "";
-	for (var i = 0; i < array.length; i++) {
-		result += String.fromCharCode(parseInt(array[i], 2));
-	}
-	return result;
-}
-
-function string2Bin(str) {
-	var result = [];
-	for (var i = 0; i < str.length; i++) {
-		result.push(str.charCodeAt(i));
-	}
-	return result;
-}
-
-function bin2String(array) {
-	return String.fromCharCode.apply(String, array);
-}
-
-
-function displayMyMessage(message) {
-	chatBox.innerHTML += "<div class='myMessage'>"+message+"</div>";
-}
-
-
-function displayMessage(message) {
-	chatBox.innerHTML += "<div class='message'>"+message+"</div>";
-}
-
 // Keyboard shortcut to send the text image
 document.addEventListener("keydown", function(event) {
 	if(event.which == 13 && document.activeElement == textBox) {
 		send();
 	}
 });
+
+document.getElementById("buttonContainer").onclick = function() {
+	//Handle click event for send button
+	send();
+}
+
+document.getElementById("attachment").onclick = function() {
+	//Handle click event for attachment button
+	console.log("Attachment pressed");
+	document.getElementById('myImageFile').click();
+}
 
 // Function to open the settingsBar
 document.getElementById("settingsContainer").onclick = function() {
@@ -331,4 +290,13 @@ document.getElementById("settingsContainer").onclick = function() {
 		} else {
 		settingsBar.classList.add("settingsOpened");
 	}
+}
+
+function array2String(array) {
+	var newString = array.join();
+	return newString;
+}
+function string2Array(string) {
+	var newArray = JSON.parse("["+string+"]");
+	return newArray;
 }
