@@ -71,12 +71,16 @@ socket.on('ProtocolStep1', function(Protocol1Received){
 	var hashedNonceReceived = cryptico.decrypt(Protocol1Received.hashedNonce, myRSAKey);
 	// console.log("Nonce received: "+ nonceArray);
 	if(sha1(nonceReceived.plaintext) != hashedNonceReceived.plaintext ){
-		console.log("Nonce has been tampered with")
-	} else {
-		// Create session key with my nonce and nonceReceived
-		console.log("Client "+usrName+" is emitting protocolStep3");
-		sharedSecretKey = createSessionKey(myNonce, nonceArray);
-		protocolStep3(nonceArray);
+		console.log("Nonce has been tampered with");
+		} else {
+		console.log("Nonce hash is intact");
+		if(hashedNonceReceived.signature=="verified"){
+			console.log("Nonce signature is verified");
+			// Create session key with my nonce and nonceReceived
+			console.log("Client "+usrName+" is emitting protocolStep3");
+			sharedSecretKey = createSessionKey(myNonce, nonceArray);
+			protocolStep3(nonceArray);
+		} else {console.log("Nonce signature is not verified");}
 	}
 });
 
@@ -106,11 +110,27 @@ function createSessionKey(keyA, keyB) {
 
 socket.on('nonce package', function(noncePackageReceived){
 	//~ console.log(noncePackageReceived.otherNonce.plaintext);
-	otherUserNonce = string2Array(cryptico.decrypt(noncePackageReceived.otherNonce,myRSAKey).plaintext);
+	var otherNonce = cryptico.decrypt(noncePackageReceived.otherNonce,myRSAKey).plaintext;
+	otherUserNonce = string2Array(otherNonce);
 	var AESResponse = cryptico.decrypt(noncePackageReceived.response,myRSAKey).plaintext;
-	var hashedOtherUserNonce = cryptico.decrypt(noncePackageReceived.response, myRSAKey).plaintext;
+	var hashedOtherUserNonce = cryptico.decrypt(noncePackageReceived.hashedNonce, myRSAKey).plaintext;
+	var signature1 = cryptico.decrypt(noncePackageReceived.hashedNonce, myRSAKey).signature;
 	var hashedAESResponse = cryptico.decrypt(noncePackageReceived.hashedResponse, myRSAKey).plaintext;
-	sharedSecretKey = createSessionKey(otherUserNonce,myNonce);
+	var signature2 = cryptico.decrypt(noncePackageReceived.hashedResponse, myRSAKey).signature;
+	if(sha1(otherNonce)==hashedOtherUserNonce&&sha1(AESResponse)==hashedAESResponse){
+		console.log("Hashes are intact");
+		if(signature1=="verified"&&signature2=="verified") {
+			console.log("Signatures are verified");
+			sharedSecretKey = createSessionKey(otherUserNonce,myNonce);
+			if(decrypt(AESResponse, sharedSecretKey)==array2String(myNonce)){
+				console.log("Session key matches for both clients");
+			}
+			}else{
+			console.log("Signatures are not verified");
+		}
+		}else{
+		console.log("Hash is not intact");
+	}
 });
 
 // Function that takes in the message to be encrypted and the public key
@@ -146,7 +166,7 @@ function decrypt ( inputStr,key ) {
 	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
 	var decryptedBytes = aesCtr.decrypt(encryptedBytes);
 	
-
+	
 	// Convert our bytes back into text
 	var decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
 	return decryptedText;
@@ -169,17 +189,17 @@ function send() {
 			textBox.value = "";		// clear the textBox
 			var encryptedMsg = aesEncrypt(myMessage, sharedSecretKey);
 			var msg = {};
-			msg.encryptFlag = aesEncrypt("1", sharedSecretKey);
+			msg.encryptFlag = sha1("1");
 			msg.encryptedMsg = encryptedMsg;
 			socket.emit("chat message", msg);	//Emit the text message
 			displayMyMessage(myMessage);		// Display my message
-		} else {
+			} else {
 			console.log("Encryption is off");
 			var myMessage = textBox.value; // get the textBox contents
 			textBox.value = "";		// clear the textBox
 			var encryptedMsg = myMessage;
 			var msg = {};
-			msg.encryptFlag = aesEncrypt("0", sharedSecretKey);
+			msg.encryptFlag = sha1("0");
 			msg.encryptedMsg = encryptedMsg;
 			socket.emit("chat message", msg);	//Emit the text message
 			displayMyMessage(myMessage);		// Display my message
@@ -189,11 +209,11 @@ function send() {
 
 // When a 'chat message' event is received, run this function
 socket.on('chat message', function(msg){
-	otherUserFlag = decrypt(msg.otherUserFlag, sharedSecretKey);
-	if(otherUserFlag == "1") {
+	otherUserFlag = msg.otherUserFlag;
+	if(otherUserFlag == sha1("1")) {
 		var decryptedMsg = decrypt(msg.message, sharedSecretKey);
 		displayMessage(decryptedMsg);
-	} else {
+		} else if(otherUserFlag == sha1("0")){
 		displayMessage(msg.message);
 	}
     
@@ -229,7 +249,13 @@ function readImageFile(input) {
 function sendFile(file,data){
 	var msg = {}; // create a message object
 	msg.username = usrName; //create properties for the message object
-	var encryptedFile = aesEncrypt(data, sharedSecretKey);
+	if(encryptionSwitch.checked) {
+		var encryptedFile = aesEncrypt(data, sharedSecretKey);
+		msg.encryptFlag = sha1("1");
+	} else {
+		var encryptedFile = data;
+		msg.encryptFlag = sha1("0");
+	}
 	msg.file = encryptedFile;
 	msg.fileName = file.name;
 	console.log(msg.fileName);
@@ -238,7 +264,11 @@ function sendFile(file,data){
 
 // When a 'base64 file' event is received, run this function  
 socket.on('base64 file', function(msg) {
-	var decryptedFile = decrypt(msg.file, sharedSecretKey);
+	if(msg.encryptFlag==sha1("1")) {
+		var decryptedFile = decrypt(msg.file, sharedSecretKey);
+	} else if(msg.encryptFlag==sha1("0")){
+		var decryptedFile = msg.file;
+	}
 	displayImage(decryptedFile);
 });
 

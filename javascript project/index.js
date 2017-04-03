@@ -77,7 +77,8 @@ io.on('connection', function(socket){
         {
           username: socket.username,
           file: msg.file,
-          fileName: msg.fileName
+          fileName: msg.fileName,
+		  encryptFlag: msg.encryptFlag
         }
 
     );
