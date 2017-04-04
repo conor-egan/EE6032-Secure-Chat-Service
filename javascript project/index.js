@@ -20,6 +20,7 @@ io.on('connection', function(socket){
   // When a client disconnects, run this function
   socket.on('disconnect', function(){
     console.log('User disconnected');
+	socket.broadcast.emit('User Disconnected');
   });
   
   // When a public key is received
@@ -27,7 +28,9 @@ io.on('connection', function(socket){
 	socket.broadcast.emit('public key', 
 		{
 			publicKey: publicKeyExchange.publicKey,
-			hashedKey: publicKeyExchange.hashedKey
+			hashedKey: publicKeyExchange.hashedKey,
+			userName: publicKeyExchange.userName,
+			hashedUserName: publicKeyExchange.hashedUserName
 		}
 	);
   });

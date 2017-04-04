@@ -3,7 +3,7 @@ var textBox = document.getElementById("textInput");
 var chatBox = document.getElementById("chatArea");
 var encryptionSwitch = document.getElementById("encryptionBox");
 var socket = io();
-var usrName, Passphrase;
+var usrName, Passphrase, otherUserName;
 var myMessage;
 var myNonce, otherUserNonce;
 var bits = 1024;
@@ -13,6 +13,7 @@ var encryptFlag, otherUserFlag;
 
 function start(){
 	usrName = prompt("Enter your username");
+	addClientName();
 	Passphrase = prompt("Enter a passphrase for encryption");
 	myNonce = createNonce();
 	myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
@@ -35,6 +36,8 @@ function sendPublicKey(key) {
 	var publicKeyExchange = {};
 	publicKeyExchange.publicKey = key;
 	publicKeyExchange.hashedKey = sha1(key);
+	publicKeyExchange.userName = usrName;
+	publicKeyExchange.hashedUserName = sha1(usrName);
 	socket.emit('public key', publicKeyExchange);
 	console.log("Public key sent");
 }
@@ -46,8 +49,10 @@ socket.on('public key', function(publicKeyReceived) {
 		otherPublicKey = publicKeyReceived.publicKey;
 		
 		var HashKey = publicKeyReceived.hashedKey;
-		if(sha1(otherPublicKey) == HashKey) {
+		if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
 			console.log('Integrity of key exists');
+			otherUserName = publicKeyReceived.userName;
+			addOtherClientName();
 		}
 	}
 	else {
@@ -227,6 +232,14 @@ function displayMessage(message) {
 	chatBox.innerHTML += "<div class='message'>"+message+"</div>";
 }
 
+function displayEncryptionOn() {
+	chatBox.innerHTML += "<div class='encryptOn'>Encryption is now on. Your messages are secure.</div>";
+}
+
+function displayEncryptionOff() {
+	chatBox.innerHTML += "<div class='encryptOff'>Encryption is now off. Your messages are not secure.</div>";
+}
+
 // Take the file data from the input button, read the file
 function readImageFile(input) {
 	if (input.files && input.files[0]) {
@@ -252,7 +265,7 @@ function sendFile(file,data){
 	if(encryptionSwitch.checked) {
 		var encryptedFile = aesEncrypt(data, sharedSecretKey);
 		msg.encryptFlag = sha1("1");
-	} else {
+		} else {
 		var encryptedFile = data;
 		msg.encryptFlag = sha1("0");
 	}
@@ -266,7 +279,7 @@ function sendFile(file,data){
 socket.on('base64 file', function(msg) {
 	if(msg.encryptFlag==sha1("1")) {
 		var decryptedFile = decrypt(msg.file, sharedSecretKey);
-	} else if(msg.encryptFlag==sha1("0")){
+		} else if(msg.encryptFlag==sha1("0")){
 		var decryptedFile = msg.file;
 	}
 	displayImage(decryptedFile);
@@ -293,6 +306,36 @@ function displayMyImage(src) {
 	chatBox.getElementsByClassName("myImageContainer")[chatBox.getElementsByClassName("myImageContainer").length-1].appendChild(img);
 }
 
+function addClientName() {
+	var nameDiv = document.createElement('div');
+	nameDiv.classList.add("nameDiv");
+	nameDiv.innerHTML=usrName.charAt(0);
+	var clientName = document.createElement('div');
+	clientName.classList.add("clientName");
+	clientName.innerHTML=usrName+" (You)";
+	document.getElementById("nameContainer").appendChild(nameDiv);
+	document.getElementById("nameContainer").appendChild(clientName);
+}
+
+function addOtherClientName() {
+	var nameDiv = document.createElement('div');
+	nameDiv.classList.add("nameDiv");
+	nameDiv.classList.add("otherNameDiv");
+	nameDiv.innerHTML=otherUserName.charAt(0);
+	var clientName = document.createElement('div');
+	clientName.classList.add("clientName");
+	clientName.innerHTML=otherUserName;
+	document.getElementById("otherNameContainer").appendChild(nameDiv);
+	document.getElementById("otherNameContainer").appendChild(clientName);
+}
+
+socket.on('User Disconnected', function() {
+	var disconnectedClient = document.getElementById("otherNameContainer");
+	while(disconnectedClient.firstChild) {
+		disconnectedClient.removeChild(disconnectedClient.firstChild);
+	}
+});
+
 // Keyboard shortcut to send the text image
 document.addEventListener("keydown", function(event) {
 	if(event.which == 13 && document.activeElement == textBox) {
@@ -303,6 +346,15 @@ document.addEventListener("keydown", function(event) {
 document.getElementById("buttonContainer").onclick = function() {
 	//Handle click event for send button
 	send();
+}
+
+encryptionSwitch.onchange = function() {
+	//Handle click event for send button
+	if(encryptionSwitch.checked){
+		displayEncryptionOn();
+		}else{
+		displayEncryptionOff();
+	}
 }
 
 document.getElementById("attachment").onclick = function() {
