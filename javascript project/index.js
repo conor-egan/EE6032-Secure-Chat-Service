@@ -35,6 +35,18 @@ io.on('connection', function(socket){
 	);
   });
   
+    // When a public key is returned
+  socket.on('return public key', function(publicKeyExchange){
+	socket.broadcast.emit('return public key', 
+		{
+			publicKey: publicKeyExchange.publicKey,
+			hashedKey: publicKeyExchange.hashedKey,
+			userName: publicKeyExchange.userName,
+			hashedUserName: publicKeyExchange.hashedUserName
+		}
+	);
+  });
+  
   // When a nonce is received
   socket.on('ProtocolStep1', function(step1){
 	socket.broadcast.emit('ProtocolStep1', 
@@ -43,7 +55,6 @@ io.on('connection', function(socket){
 			hashedNonce: step1.hashed
 		}
 	);
-	//console.log("Step1: " + step1);
   });
   
   // When a nonce package is received

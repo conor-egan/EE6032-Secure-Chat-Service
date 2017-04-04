@@ -11,6 +11,7 @@ var myRSAKey, myPublicKey, otherPublicKey;
 var sharedSecretKey;
 var encryptFlag, otherUserFlag;
 
+// Function run once a client a client connects to the server from index.html
 function start(){
 	usrName = prompt("Enter your username");
 	addClientName();
@@ -18,20 +19,19 @@ function start(){
 	myNonce = createNonce();
 	myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
 	myPublicKey = cryptico.publicKeyString(myRSAKey);
-	sendPublicKey(myPublicKey);
-	console.log("Client: "+usrName+" has completed start()");
-	
+	sendPublicKey(myPublicKey);	
 }
 
+// Function to create a random 8 byte nonce
 function createNonce() {
 	var array = [];
 	for(i=0;i<8;i++) {
 		array.push(Math.round(Math.random()*255));
 	}
 	return array;
-	console.log("Nonce Successfully created");
 }
 
+// Function to send the public key once a clinet connects to server
 function sendPublicKey(key) {
 	var publicKeyExchange = {};
 	publicKeyExchange.publicKey = key;
@@ -39,69 +39,76 @@ function sendPublicKey(key) {
 	publicKeyExchange.userName = usrName;
 	publicKeyExchange.hashedUserName = sha1(usrName);
 	socket.emit('public key', publicKeyExchange);
-	console.log("Public key sent");
 }
 
+// Function to send your own public key once a key is received
+function returnPublicKey(key) {
+	var publicKeyExchange = {};
+	publicKeyExchange.publicKey = key;
+	publicKeyExchange.hashedKey = sha1(key);
+	publicKeyExchange.userName = usrName;
+	publicKeyExchange.hashedUserName = sha1(usrName);
+	socket.emit('return public key', publicKeyExchange);
+}
+
+// Code run when a key is received
 socket.on('public key', function(publicKeyReceived) {
-	if(otherPublicKey != publicKeyReceived.publicKey){
-	    sendPublicKey(myPublicKey);
-		// console.log('Other users public key: '+ publicKeyReceived.publicKey);
-		otherPublicKey = publicKeyReceived.publicKey;
+    returnPublicKey(myPublicKey);
+	otherPublicKey = publicKeyReceived.publicKey;
 		
-		var HashKey = publicKeyReceived.hashedKey;
-		if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
-			console.log('Integrity of key exists');
-			otherUserName = publicKeyReceived.userName;
-			addOtherClientName();
-		}
+	var HashKey = publicKeyReceived.hashedKey;
+	if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
+		otherUserName = publicKeyReceived.userName;
+		addOtherClientName();
 	}
-	else {
-		// Protocol Step 1 
-		var msg = {};
-		var cipher = cryptico.encrypt(array2String(myNonce), otherPublicKey);
-		msg.nonce = cipher.cipher;
-		var hashed = cryptico.encrypt(sha1(array2String(myNonce)), otherPublicKey, myRSAKey);
-		msg.hashed = hashed.cipher;
-		socket.emit('ProtocolStep1', msg);
-		console.log("Client "+usrName+" has emitted step1");
-	}	
+});	
+
+// When other user has received my key and I received theirs	
+socket.on('return public key', function(publicKeyReceived) {
+	otherPublicKey = publicKeyReceived.publicKey;
+		
+	var HashKey = publicKeyReceived.hashedKey;
+	if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
+		otherUserName = publicKeyReceived.userName;
+		addOtherClientName();
+	}
+	// Protocol Step 1, sending a nonce and hashed nonce all RSA encrypted
+	var msg = {};
+	var cipher = cryptico.encrypt(array2String(myNonce), otherPublicKey);
+	msg.nonce = cipher.cipher;
+	var hashed = cryptico.encrypt(sha1(array2String(myNonce)), otherPublicKey, myRSAKey);
+	msg.hashed = hashed.cipher;
+	socket.emit('ProtocolStep1', msg);
 });
 
-// On receiving ProtocolStep1, emit step2
+// When step 1 is received: check integrity and signature of nonce,
+// create the session key, emit protocol step 3
 socket.on('ProtocolStep1', function(Protocol1Received){
-	console.log("Entering receive protocolStep1");
 	var nonceReceived = cryptico.decrypt(Protocol1Received.nonceReceived, myRSAKey);
-	console.log(nonceReceived.plaintext);
 	var nonceArray = string2Array(nonceReceived.plaintext);
 	var hashedNonceReceived = cryptico.decrypt(Protocol1Received.hashedNonce, myRSAKey);
-	// console.log("Nonce received: "+ nonceArray);
 	if(sha1(nonceReceived.plaintext) != hashedNonceReceived.plaintext ){
 		console.log("Nonce has been tampered with");
 		} else {
-		console.log("Nonce hash is intact");
 		if(hashedNonceReceived.signature=="verified"){
-			console.log("Nonce signature is verified");
 			// Create session key with my nonce and nonceReceived
-			console.log("Client "+usrName+" is emitting protocolStep3");
 			sharedSecretKey = createSessionKey(myNonce, nonceArray);
 			protocolStep3(nonceArray);
 		} else {console.log("Nonce signature is not verified");}
 	}
 });
 
+// Send protocol step 3
 function protocolStep3(receivedNonce) {
-	console.log(array2String(myNonce));
 	var step3Msg = {};
 	step3Msg.myNonce = cryptico.encrypt(array2String(myNonce), otherPublicKey).cipher;
-	console.log("My nonce cipher: "+step3Msg.myNonce+" type: "+typeof(step3Msg.myNonce));
 	step3Msg.nonceReceived = cryptico.encrypt(aesEncrypt(array2String(receivedNonce),sharedSecretKey), otherPublicKey).cipher;
 	step3Msg.hashedNonce = cryptico.encrypt(sha1(array2String(myNonce)), otherPublicKey, myRSAKey).cipher;
 	step3Msg.hashedResponse = cryptico.encrypt(sha1(aesEncrypt(array2String(receivedNonce),sharedSecretKey)), otherPublicKey, myRSAKey).cipher;
-	console.log("Step3Msg: "+step3Msg+" type: "+typeof(step3Msg));
 	socket.emit('nonce package', step3Msg);
-	console.log("Step3 Emitted successfully");
 }
 
+// Function to creeate a session key using my nonce and the other user nonce
 function createSessionKey(keyA, keyB) {
 	var sessionKey = [];
 	for(i=0;i<keyA.length;i++){
@@ -113,8 +120,9 @@ function createSessionKey(keyA, keyB) {
 	return sessionKey;
 }
 
+// When protocol step 3 is received:
+// Decrypt and verify everything and create own session key
 socket.on('nonce package', function(noncePackageReceived){
-	//~ console.log(noncePackageReceived.otherNonce.plaintext);
 	var otherNonce = cryptico.decrypt(noncePackageReceived.otherNonce,myRSAKey).plaintext;
 	otherUserNonce = string2Array(otherNonce);
 	var AESResponse = cryptico.decrypt(noncePackageReceived.response,myRSAKey).plaintext;
@@ -123,12 +131,9 @@ socket.on('nonce package', function(noncePackageReceived){
 	var hashedAESResponse = cryptico.decrypt(noncePackageReceived.hashedResponse, myRSAKey).plaintext;
 	var signature2 = cryptico.decrypt(noncePackageReceived.hashedResponse, myRSAKey).signature;
 	if(sha1(otherNonce)==hashedOtherUserNonce&&sha1(AESResponse)==hashedAESResponse){
-		console.log("Hashes are intact");
 		if(signature1=="verified"&&signature2=="verified") {
-			console.log("Signatures are verified");
 			sharedSecretKey = createSessionKey(otherUserNonce,myNonce);
 			if(decrypt(AESResponse, sharedSecretKey)==array2String(myNonce)){
-				console.log("Session key matches for both clients");
 			}
 			}else{
 			console.log("Signatures are not verified");
@@ -142,14 +147,13 @@ socket.on('nonce package', function(noncePackageReceived){
 // for the target recipient
 function rsaEncrypt(message, targetPublicKey) {
 	var EncryptionResult = cryptico.encrypt(message, targetPublicKey);
-	console.log(EncryptionResult.cipher); // log the encrypted message to the console
 	return EncryptionResult.cipher;	// return the encrypted message
 }
 
 // Function that decrypts an incoming RSA encrypted message using my private key
 function rsaDecrypt(encryptedMessage, myRSAKey) {
 	var EncryptionResult = cryptico.decrypt(encryptedMessage, myRSAKey);
-	console.log(EncryptionResult.plaintext);
+	//console.log(EncryptionResult.plaintext);
 	return EncryptionResult.plaintext;
 }
 
@@ -166,6 +170,7 @@ function aesEncrypt(message, key) {
 	return encryptedHex;
 }
 
+// Function to AES decrypt cipher text
 function decrypt ( inputStr,key ) {
 	var encryptedBytes = aesjs.utils.hex.toBytes(inputStr);
 	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
@@ -185,11 +190,10 @@ function sha1(message) {
 	return hash;
 }
 
-// Funtion to send a chat message
+// Funtion to send a chat message, checks whether or not the message is to be encrypted
 function send() {
 	if(textBox.value != "") { // if textBox is not empty
 		if(encryptionSwitch.checked) {
-			console.log("Encryption is on");
 			var myMessage = textBox.value; // get the textBox contents
 			textBox.value = "";		// clear the textBox
 			var encryptedMsg = aesEncrypt(myMessage, sharedSecretKey);
@@ -199,7 +203,6 @@ function send() {
 			socket.emit("chat message", msg);	//Emit the text message
 			displayMyMessage(myMessage);		// Display my message
 			} else {
-			console.log("Encryption is off");
 			var myMessage = textBox.value; // get the textBox contents
 			textBox.value = "";		// clear the textBox
 			var encryptedMsg = myMessage;
@@ -213,6 +216,7 @@ function send() {
 }
 
 // When a 'chat message' event is received, run this function
+// Check if the message is to be decrypted
 socket.on('chat message', function(msg){
 	otherUserFlag = msg.otherUserFlag;
 	if(otherUserFlag == sha1("1")) {
@@ -224,18 +228,22 @@ socket.on('chat message', function(msg){
     
 });
 
+// Function to display my message to the page
 function displayMyMessage(message) {
-	chatBox.innerHTML += "<div class='myMessage'>"+message+"</div>";
+	chatBox.innerHTML += "<div class='myMessage'>"+"<b>"+usrName+"</b>"+"<b>: </b>"+message+"</div>";
 }
 
+// Function to display other user message to the page
 function displayMessage(message) {
-	chatBox.innerHTML += "<div class='message'>"+message+"</div>";
+	chatBox.innerHTML += "<div class='message'>"+"<b>"+otherUserName+"</b>"+"<b>: </b>"+message+"</div>";
 }
 
+// Function to display a message in chat area to show that encryption is on
 function displayEncryptionOn() {
 	chatBox.innerHTML += "<div class='encryptOn'>Encryption is now on. Your messages are secure.</div>";
 }
 
+// Function to display a message in chat area to show that encryption is off
 function displayEncryptionOff() {
 	chatBox.innerHTML += "<div class='encryptOff'>Encryption is now off. Your messages are not secure.</div>";
 }
@@ -271,7 +279,6 @@ function sendFile(file,data){
 	}
 	msg.file = encryptedFile;
 	msg.fileName = file.name;
-	console.log(msg.fileName);
 	socket.emit('base64 file', msg); // send the file to the server
 }
 
@@ -291,7 +298,6 @@ function displayImage(src) {
 	img.classList.add("image");
 	img.src = src;
 	chatBox.innerHTML += "<div class='imageContainer'></div>"; // Attach the image Container to the chatBox
-	console.log(chatBox.getElementsByClassName("imageContainer").length);
 	chatBox.getElementsByClassName("imageContainer")[chatBox.getElementsByClassName("imageContainer").length-1].appendChild(img);
 	// This line gets the array of elements of className 'imageContainer' and appends 'img' to the last 'imageContainer'
 }
@@ -302,10 +308,10 @@ function displayMyImage(src) {
 	img.classList.add("myImage");
 	img.src = src;
 	chatBox.innerHTML += "<div class='myImageContainer'></div>";
-	console.log(chatBox.getElementsByClassName("myImageContainer").length);
 	chatBox.getElementsByClassName("myImageContainer")[chatBox.getElementsByClassName("myImageContainer").length-1].appendChild(img);
 }
 
+// Adds the name of the client to the settings container
 function addClientName() {
 	var nameDiv = document.createElement('div');
 	nameDiv.classList.add("nameDiv");
@@ -317,6 +323,7 @@ function addClientName() {
 	document.getElementById("nameContainer").appendChild(clientName);
 }
 
+// Adds the names of the other client to the settings container
 function addOtherClientName() {
 	var nameDiv = document.createElement('div');
 	nameDiv.classList.add("nameDiv");
@@ -329,6 +336,7 @@ function addOtherClientName() {
 	document.getElementById("otherNameContainer").appendChild(clientName);
 }
 
+// Removed the other client from the settings bar when they disconnect
 socket.on('User Disconnected', function() {
 	var disconnectedClient = document.getElementById("otherNameContainer");
 	while(disconnectedClient.firstChild) {
@@ -348,6 +356,7 @@ document.getElementById("buttonContainer").onclick = function() {
 	send();
 }
 
+// When the encryption switch is toggled, display notification to the user
 encryptionSwitch.onchange = function() {
 	//Handle click event for send button
 	if(encryptionSwitch.checked){
@@ -359,14 +368,12 @@ encryptionSwitch.onchange = function() {
 
 document.getElementById("attachment").onclick = function() {
 	//Handle click event for attachment button
-	console.log("Attachment pressed");
 	document.getElementById('myImageFile').click();
 }
 
 // Function to open the settingsBar
 document.getElementById("settingsContainer").onclick = function() {
 	//Handle click event for settings button
-	console.log("Settings button pressed");
 	if(settingsBar.classList.contains("settingsOpened")){
 		settingsBar.classList.remove("settingsOpened");
 		} else {
@@ -374,10 +381,13 @@ document.getElementById("settingsContainer").onclick = function() {
 	}
 }
 
+// Function to convert an array to a string
 function array2String(array) {
 	var newString = array.join();
 	return newString;
 }
+
+// Function to convert a string to an array
 function string2Array(string) {
 	var newArray = JSON.parse("["+string+"]");
 	return newArray;
