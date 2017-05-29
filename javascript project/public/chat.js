@@ -19,7 +19,7 @@ function start(){
 	myNonce = createNonce();
 	myRSAKey = cryptico.generateRSAKey(Passphrase, bits);
 	myPublicKey = cryptico.publicKeyString(myRSAKey);
-	sendPublicKey(myPublicKey);	
+	sendPublicKey(myPublicKey);
 }
 
 // Function to create a random 8 byte nonce
@@ -55,18 +55,18 @@ function returnPublicKey(key) {
 socket.on('public key', function(publicKeyReceived) {
     returnPublicKey(myPublicKey);
 	otherPublicKey = publicKeyReceived.publicKey;
-		
+
 	var HashKey = publicKeyReceived.hashedKey;
 	if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
 		otherUserName = publicKeyReceived.userName;
 		addOtherClientName();
 	}
-});	
+});
 
-// When other user has received my key and I received theirs	
+// When other user has received my key and I received theirs
 socket.on('return public key', function(publicKeyReceived) {
 	otherPublicKey = publicKeyReceived.publicKey;
-		
+
 	var HashKey = publicKeyReceived.hashedKey;
 	if(sha1(otherPublicKey) == HashKey&&sha1(publicKeyReceived.userName)==publicKeyReceived.hashedUserName) {
 		otherUserName = publicKeyReceived.userName;
@@ -162,7 +162,7 @@ function rsaDecrypt(encryptedMessage, myRSAKey) {
 // a 128 bit key, converts the string to binary, encrypts the message,
 // prints the encrypted message, calls the decrypt function and prints
 // the decrypted message, then closes the AES session
-function aesEncrypt(message, key) {	
+function aesEncrypt(message, key) {
 	var textBytes = aesjs.utils.utf8.toBytes(message);
 	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
 	var encryptedBytes = aesCtr.encrypt(textBytes);
@@ -175,8 +175,8 @@ function decrypt ( inputStr,key ) {
 	var encryptedBytes = aesjs.utils.hex.toBytes(inputStr);
 	var aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter());
 	var decryptedBytes = aesCtr.decrypt(encryptedBytes);
-	
-	
+
+
 	// Convert our bytes back into text
 	var decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
 	return decryptedText;
@@ -225,7 +225,7 @@ socket.on('chat message', function(msg){
 		} else if(otherUserFlag == sha1("0")){
 		displayMessage(msg.message);
 	}
-    
+
 });
 
 // Function to display my message to the page
@@ -253,14 +253,14 @@ function readImageFile(input) {
 	if (input.files && input.files[0]) {
 		var fileName = input.files[0]; // get the name of the file
         var reader = new FileReader(); // Create a new file reader object
-		
+
 		// When data is available to the reader
         reader.onload = function (e) {
             var src = e.target.result; // get the source of the file
             displayMyImage(src);		// call displayMyImage() with the file source
             sendFile(fileName,src);	// Send the image with sendFile()
 		};
-		
+
         reader.readAsDataURL(fileName); // Read the file
 	}
 }
@@ -282,7 +282,7 @@ function sendFile(file,data){
 	socket.emit('base64 file', msg); // send the file to the server
 }
 
-// When a 'base64 file' event is received, run this function  
+// When a 'base64 file' event is received, run this function
 socket.on('base64 file', function(msg) {
 	if(msg.encryptFlag==sha1("1")) {
 		var decryptedFile = decrypt(msg.file, sharedSecretKey);
