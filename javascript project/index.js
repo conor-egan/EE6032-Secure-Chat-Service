@@ -1,3 +1,12 @@
+/*
+*
+* @Authors
+* Niall Phillips
+* Conor Egan
+* Simon Griffin
+*
+*/
+
 // Require the server dependecies, node modules
 var express = require('express'); 	// node web application framework
 var app = express();				// New instance of express
@@ -5,7 +14,7 @@ var http = require('http').Server(app);	// create node simple server
 var io = require('socket.io')(http);	// Load socket.io on the server
 
 
-// When a client connects to the server, 
+// When a client connects to the server,
 // this sends the HTML file to the client's browser
 app.get('/', function(req, res){
   res.sendFile(__dirname + '/index.html');
@@ -14,18 +23,18 @@ app.get('/', function(req, res){
 // Connection event handler for the server
 // When a client connects to the server run this function
 io.on('connection', function(socket){
-	
+
   console.log('User connected'); // Print User connected
-  
+
   // When a client disconnects, run this function
   socket.on('disconnect', function(){
     console.log('User disconnected');
 	socket.broadcast.emit('User Disconnected');
   });
-  
+
   // When a public key is received
   socket.on('public key', function(publicKeyExchange){
-	socket.broadcast.emit('public key', 
+	socket.broadcast.emit('public key',
 		{
 			publicKey: publicKeyExchange.publicKey,
 			hashedKey: publicKeyExchange.hashedKey,
@@ -34,10 +43,10 @@ io.on('connection', function(socket){
 		}
 	);
   });
-  
+
     // When a public key is returned
   socket.on('return public key', function(publicKeyExchange){
-	socket.broadcast.emit('return public key', 
+	socket.broadcast.emit('return public key',
 		{
 			publicKey: publicKeyExchange.publicKey,
 			hashedKey: publicKeyExchange.hashedKey,
@@ -46,20 +55,20 @@ io.on('connection', function(socket){
 		}
 	);
   });
-  
+
   // When a nonce is received
   socket.on('ProtocolStep1', function(step1){
-	socket.broadcast.emit('ProtocolStep1', 
+	socket.broadcast.emit('ProtocolStep1',
 		{
 			nonceReceived: step1.nonce,
 			hashedNonce: step1.hashed
 		}
 	);
   });
-  
+
   // When a nonce package is received
   socket.on('nonce package', function(noncePackage){
-	socket.broadcast.emit('nonce package', 
+	socket.broadcast.emit('nonce package',
 		{
 			response: noncePackage.nonceReceived,
 			otherNonce: noncePackage.myNonce,
@@ -68,19 +77,19 @@ io.on('connection', function(socket){
 		}
 	);
   });
-  
+
   // When a socket (user) sends a chat message run this function
   socket.on('chat message', function(msg){
     console.log('message as seen by the server: ' + msg.encryptedMsg);
     // The sending socket broadcasts its message to all other clients and not itself
-    socket.broadcast.emit('chat message', 
+    socket.broadcast.emit('chat message',
 		{
 			otherUserFlag: msg.encryptFlag,
 			message: msg.encryptedMsg
 		}
 	);
   });
-  
+
   // When a socket (user) sends an image file...
   socket.on('base64 file', function (msg) {
     console.log('received base64 file from ' + msg.username);
@@ -97,7 +106,7 @@ io.on('connection', function(socket){
 
     );
 });
-  
+
 });
 
 
