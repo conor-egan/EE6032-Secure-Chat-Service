@@ -1,3 +1,13 @@
+/* 
+*
+* @Authors
+* Niall Phillips
+* Conor Egan
+* Simon Griffin
+*
+*/
+
+
 var settingsBar = document.getElementsByClassName("settingsBar")[0];
 var textBox = document.getElementById("textInput");
 var chatBox = document.getElementById("chatArea");
