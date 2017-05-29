@@ -22,5 +22,4 @@ The project uses RSA encryption to mutually generate a session key, which is the
 
 The protocol diagram for the encryption protocol implemented can be seen below:
 
-![Protocol Diagram]
-(https://octodex.github.com/images/yaktocat.png)
+![Protocol Diagram](https://github.com/conor-egan/EE6032-Secure-Chat-Service/blob/master/Protocol%20Diagram.png)
